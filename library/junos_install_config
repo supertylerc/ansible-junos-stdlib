@@ -111,6 +111,13 @@ options:
               Refer to the B(netconify) utility for details.
         required: false
         default: None
+    lint:
+        description:
+            - Load the configuration and verify that the configuration is
+              valid but don't apply the configuration
+        required: false
+        default: no
+        choices: ['true','false','yes','no']
 '''
 
 EXAMPLES = '''
@@ -184,9 +191,17 @@ def junos_install_config(module, dev):
 
         diff = cu.diff()
         if diff is not None:
-            logging.info("committing change, please be patient")
-            cu.commit()
-            results['changed'] = True
+            lint = module.boolean(module.params['lint'])
+            if lint:
+                logging.info("Verifying configuration.  Please be patient.")
+                results['lint'] = cu.commit_check()
+                results['changed'] = False
+                results['diff'] = diff
+                cu.rollback()
+            else:
+                logging.info("committing change, please be patient")
+                cu.commit()
+                results['changed'] = True
 
         logging.info("unlocking")
         cu.unlock()
@@ -305,7 +320,8 @@ def main():
             overwrite=dict(required=False, choices=BOOLEANS, default=False),
             logfile=dict(required=False, default=None),
             savedir=dict(required=False),
-            timeout=dict(required=False, default=0)),
+            timeout=dict(required=False, default=0)
+            lint=dict(required=False, choices=BOOLEANS, default=False),
         supports_check_mode=False)
 
     if not HAS_PYEZ:
